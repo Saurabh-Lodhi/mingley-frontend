@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Mingley",
+    "slug": "mingley",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.shivam.mingley"
+    },
+    "android": {
+      "package": "com.shivam.mingley",
+      "usesCleartextTraffic": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

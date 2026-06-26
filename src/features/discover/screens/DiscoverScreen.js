@@ -1,0 +1,318 @@
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity,
+  Platform, ActivityIndicator, Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
+import FAIcon from 'react-native-vector-icons/FontAwesome5';
+import { SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { SwipeCard } from '../components/SwipeCard';
+import { ActionButtons } from '../components/ActionButtons';
+import { FilterSheet } from '../components/FilterSheet';
+import { SuperchatModal } from '../components/SuperchatModal';
+import { useFilterStore } from '../store/useFilterStore';
+import { useDiscoverStore } from '../store/useDiscoverStore';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTheme } from '../../../theme/ThemeContext';
+
+const TITLE_FONT = Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif';
+const TITLE_MED = Platform.OS === 'ios' ? 'AvenirNext-Medium' : 'sans-serif-medium';
+
+// ─── Component ───────────────────────────────────────────────────────────────
+import { useSubscriptionStore } from '../../subscription/store/useSubscriptionStore';
+import { useProfileStore } from '../../profile/store/useProfileStore';
+
+const areFiltersEqual = (f1, f2) => {
+  if (!f1 || !f2) return false;
+  return (
+    f1.interestedIn === f2.interestedIn &&
+    f1.location === f2.location &&
+    f1.distance === f2.distance &&
+    f1.ageRange?.[0] === f2.ageRange?.[0] &&
+    f1.ageRange?.[1] === f2.ageRange?.[1] &&
+    f1.onlineStatus === f2.onlineStatus &&
+    f1.verifiedOnly === f2.verifiedOnly &&
+    f1.nearbyOnly === f2.nearbyOnly &&
+    f1.relationshipType === f2.relationshipType &&
+    JSON.stringify(f1.interests || []) === JSON.stringify(f2.interests || [])
+  );
+};
+
+export const DiscoverScreen = React.memo(() => {
+  const navigation = useNavigation();
+  const { theme } = useTheme();
+  const filters = useFilterStore();
+  const fetchProfile = useProfileStore((s) => s.fetchProfile);
+  const profile = useProfileStore((s) => s.profile);
+  const { currentStatus } = useSubscriptionStore();
+  const {
+    profiles, fetchProfiles, swipe, isLoading, resetPage,
+  } = useDiscoverStore();
+
+  const [isFilterVisible, setFilterVisible] = useState(false);
+  const [isSuperchatVisible, setSuperchatVisible] = useState(false);
+  const [cardsContainerHeight, setCardsContainerHeight] = useState(0);
+  const swipeRef = useRef(null);
+  const lastFiltersRef = useRef(null);
+
+  const handleReload = useCallback(async () => {
+    resetPage();
+    const currentFilters = {
+      interestedIn: useFilterStore.getState().interestedIn,
+      location: useFilterStore.getState().location,
+      distance: useFilterStore.getState().distance,
+      ageRange: useFilterStore.getState().ageRange,
+      onlineStatus: useFilterStore.getState().onlineStatus,
+      verifiedOnly: useFilterStore.getState().verifiedOnly,
+      nearbyOnly: useFilterStore.getState().nearbyOnly,
+      relationshipType: useFilterStore.getState().relationshipType,
+      interests: useFilterStore.getState().interests,
+    };
+    lastFiltersRef.current = currentFilters;
+    await fetchProfiles(currentFilters);
+  }, [resetPage, fetchProfiles]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+
+      const currentFilters = {
+        interestedIn: filters.interestedIn,
+        location: filters.location,
+        distance: filters.distance,
+        ageRange: filters.ageRange,
+        onlineStatus: filters.onlineStatus,
+        verifiedOnly: filters.verifiedOnly,
+        nearbyOnly: filters.nearbyOnly,
+        relationshipType: filters.relationshipType,
+        interests: filters.interests,
+      };
+
+      if (!lastFiltersRef.current || !areFiltersEqual(lastFiltersRef.current, currentFilters)) {
+        resetPage();
+        fetchProfiles(currentFilters);
+        lastFiltersRef.current = currentFilters;
+      }
+
+      // Reset card position if it was swiped up (for super like) and returned
+      swipeRef.current?.reset();
+    }, [fetchProfile, fetchProfiles, resetPage, filters])
+  );
+
+  const displayLocation = useMemo(() => {
+    if (profile?.location?.city) {
+      const city = profile.location.city;
+      const country = profile.location.country || '';
+      return country ? `${city}, ${country}` : city;
+    }
+    if (profile?.city) {
+      return profile.city;
+    }
+    return filters.location || 'Chicago, Il';
+  }, [profile, filters.location]);
+
+  const handleSwipeLeft = useCallback(async (user) => {
+    await swipe(user.id || user._id, 'pass');
+  }, [swipe]);
+
+  const handleSwipeRight = useCallback(async (user) => {
+    // Check subscription limits for likes
+    const hasUnlimitedLikes = currentStatus?.plan?.unlimitedLikes || false;
+    const likesRemaining = currentStatus?.likesRemaining ?? 5; // Default 5 if free
+
+    if (!hasUnlimitedLikes && likesRemaining <= 0) {
+      Alert.alert(
+        'Limit Reached',
+        'You have run out of daily likes. Upgrade to premium for unlimited likes!',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => navigation.navigate('SubscriptionPlans') }
+        ]
+      );
+      swipeRef.current?.reset(); // Reset card position if possible
+      return;
+    }
+
+    const result = await swipe(user.id || user._id, 'like');
+
+    // Show match screen if API confirms a match
+    if (result?.isMatch) {
+      navigation.navigate('Match', { matchedUser: user });
+    }
+  }, [swipe, navigation, currentStatus]);
+
+  const handleSwipeUp = useCallback(() => {
+    // Check superlike limits
+    const superLikesPerDay = currentStatus?.plan?.superLikesPerDay || 0;
+    const superLikesRemaining = currentStatus?.superLikesRemaining ?? 0;
+
+    if (superLikesPerDay !== -1 && superLikesRemaining <= 0) {
+      Alert.alert(
+        'No Super Likes',
+        'You have no Super Likes left today. Upgrade your plan to get more!',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => navigation.navigate('SubscriptionPlans') }
+        ]
+      );
+      return;
+    }
+
+    navigation.navigate('SubscriptionPlans');
+  }, [navigation, currentStatus]);
+
+  const triggerDislike = () => swipeRef.current?.swipeLeft();
+  const triggerLike = () => swipeRef.current?.swipeRight();
+  const triggerSuperchat = () => {
+    if (profiles.length > 0) {
+      setSuperchatVisible(true);
+    }
+  };
+
+  const hasActive = filters.hasActiveFilters?.();
+
+  const TopCards = useMemo(() => {
+    if (isLoading && profiles.length === 0) {
+      return <ActivityIndicator size="large" color={theme.accent} />;
+    }
+
+    if (profiles.length === 0 && !isLoading) {
+      return <Text style={[styles.noMoreText, { color: theme.textSecondary }]}>No profiles match your filters 🙈</Text>;
+    }
+
+    return profiles.slice(0, 2).map((user, index) => (
+      <SwipeCard
+        key={user.id || user._id}
+        ref={index === 0 ? swipeRef : null}
+        user={user}
+        isFirst={index === 0}
+        isSecond={index === 1}
+        availableHeight={cardsContainerHeight}
+        onSwipeLeft={handleSwipeLeft}
+        onSwipeRight={handleSwipeRight}
+        onSwipeUp={index === 0 ? handleSwipeUp : undefined}
+        onPress={index === 0 ? () => navigation.navigate('UserProfile', { user }) : undefined}
+      />
+    ));
+  }, [profiles, isLoading, cardsContainerHeight, handleSwipeLeft, handleSwipeRight, handleSwipeUp, navigation, theme]);
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Subtle Golden Background Glow in Dark Mode */}
+      {theme.isDark && (
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(179, 145, 112, 0.25)', 'rgba(0,0,0,0)']}
+          locations={[0, 0.45, 0.9]}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          pointerEvents="none"
+        />
+      )}
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={[styles.crownButton, {
+            borderColor: theme.isDark ? theme.accent : theme.actionButtonBorder,
+            backgroundColor: theme.cardBackground,
+          }]}
+          onPress={() => navigation.navigate('SubscriptionPlans')}
+          activeOpacity={0.8}
+        >
+          <FAIcon name="crown" size={20} color={theme.crownIcon} />
+        </TouchableOpacity>
+
+        <View style={styles.headerTitleContainer}>
+          <Text style={[
+            styles.headerTitle,
+            { color: theme.accent },
+            theme.isDark && { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', fontWeight: 'bold' }
+          ]}>Discover</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>{displayLocation}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.headerButton,
+            { 
+              borderColor: hasActive ? theme.accent : (theme.isDark ? theme.accent : theme.actionButtonBorder), 
+              backgroundColor: theme.cardBackground,
+              borderRadius: theme.isDark ? 26 : 16
+            },
+          ]}
+          onPress={() => setFilterVisible(true)}
+        >
+          <Icon name="options-outline" size={24} color={theme.filterIcon} />
+          {hasActive && <View style={[styles.filterDot, { backgroundColor: theme.accent }]} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Cards */}
+      <View
+        style={styles.cardsContainer}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && h !== cardsContainerHeight) setCardsContainerHeight(h);
+        }}
+      >
+        {TopCards}
+      </View>
+
+      {/* Action Buttons */}
+      <ActionButtons
+        onDislike={triggerDislike}
+        onLike={triggerLike}
+        onSuperchat={triggerSuperchat}
+      />
+
+      {/* Filter Sheet */}
+      <FilterSheet visible={isFilterVisible} onClose={() => setFilterVisible(false)} onApply={handleReload} />
+
+      {/* Superchat Modal */}
+      <SuperchatModal
+        visible={isSuperchatVisible}
+        onClose={() => setSuperchatVisible(false)}
+        user={profiles[0]}
+      />
+    </SafeAreaView>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', paddingHorizontal: SPACING.xl, paddingTop: SPACING.m,
+  },
+  headerButton: {
+    width: 52, height: 52, borderRadius: 16,
+    borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  crownButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+  },
+  filterDot: {
+    position: 'absolute', top: 10, right: 10,
+    width: 8, height: 8, borderRadius: 4,
+  },
+  headerTitleContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { ...TYPOGRAPHY.h2, marginBottom: 2, fontSize: 28, fontWeight: '600', fontFamily: TITLE_MED },
+  headerSubtitle: { ...TYPOGRAPHY.caption, fontFamily: TITLE_FONT },
+  cardsContainer: {
+    flex: 1, marginTop: 8, marginBottom: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  noMoreText: {
+    ...TYPOGRAPHY.body,
+    textAlign: 'center', paddingHorizontal: 32,
+  },
+});

@@ -1,0 +1,145 @@
+import React from 'react';
+import { View, Text, StyleSheet, Modal, Platform, Dimensions } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { useToastStore } from '../../store/useToastStore';
+
+const { width } = Dimensions.get('window');
+
+export const Toast = () => {
+  const { visible, message, title: storeTitle, type, hideToast } = useToastStore();
+
+  if (!visible) return null;
+
+  const iconName = (() => {
+    switch (type) {
+      case 'success':
+        return 'checkmark-circle';
+      case 'error':
+        return 'alert-circle';
+      case 'info':
+      default:
+        return 'information-circle';
+    }
+  })();
+
+  const iconColor = (() => {
+    switch (type) {
+      case 'success':
+        return '#4CAF50';
+      case 'error':
+        return '#E94057';
+      case 'info':
+      default:
+        return '#0284C7';
+    }
+  })();
+
+  const showFullBox = !!storeTitle || type === 'success' || type === 'error';
+
+  const title = (() => {
+    if (storeTitle) return storeTitle;
+
+    switch (type) {
+      case 'success':
+        return 'Success';
+      case 'error':
+        return 'Error';
+      case 'info':
+      default:
+        return 'Notice';
+    }
+  })();
+
+  return (
+    <Modal
+      transparent
+      animationType="fade"
+      visible={visible}
+      onRequestClose={hideToast}
+    >
+      <View style={styles.overlay}>
+        {showFullBox ? (
+          <View style={styles.toastBox}>
+            <View style={[styles.iconWrap, { backgroundColor: iconColor + '15' }]}>
+              <Icon name={iconName} size={36} color={iconColor} />
+            </View>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
+          </View>
+        ) : (
+          <View style={styles.toastBoxCompact}>
+            <Text style={styles.messageCompact}>{message}</Text>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toastBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: Math.min(width * 0.8, 320),
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  iconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111111',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif-medium',
+  },
+  message: {
+    fontSize: 14,
+    color: '#555555',
+    lineHeight: 20,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif',
+  },
+  toastBoxCompact: {
+    backgroundColor: 'rgba(17, 17, 17, 0.95)',
+    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    marginHorizontal: 40,
+    maxWidth: Math.min(width - 80, 360),
+    alignSelf: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  messageCompact: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 22,
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif-medium',
+  },
+});

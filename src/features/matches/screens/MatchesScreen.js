@@ -1,0 +1,313 @@
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ScrollView, Alert, Platform, ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image as FastImage } from 'expo-image';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { MatchesGridItem } from '../components/MatchesGridItem';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useMatchesStore } from '../store/useMatchesStore';
+import { discoverService } from '../../../services/apiServices';
+import { useTheme } from '../../../theme/ThemeContext';
+
+const TITLE_FONT = Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif';
+const TITLE_MED = Platform.OS === 'ios' ? 'AvenirNext-Medium' : 'sans-serif-medium';
+
+export const MatchesScreen = () => {
+  const navigation = useNavigation();
+  const { theme } = useTheme();
+  const { matches, fetchMatches, removeMatch, isLoading } = useMatchesStore();
+  const [likes, setLikes] = useState([]);
+  const [loadingLikes, setLoadingLikes] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMatches();
+      fetchLikes();
+    }, [fetchMatches])
+  );
+
+
+  const fetchLikes = async () => {
+    setLoadingLikes(true);
+    try {
+      const res = await discoverService.getLikesFeed();
+      setLikes(res.data?.users || []);
+    } catch (e) {
+      console.error('Fetch likes error:', e);
+    } finally {
+      setLoadingLikes(false);
+    }
+  };
+
+  const { today, yesterday } = useMemo(() => {
+    // If API doesn't provide dates, we just put everything in 'today' for now
+    return {
+      today: matches,
+      yesterday: [],
+    };
+  }, [matches]);
+
+  // ── Decline / Chat ────────────────────────────────────────────────────────
+  const handleChat = (match) => {
+    const user = match.matchedUser || match.user || match;
+    navigation.navigate('Chat', { user, chatId: match.chatId });
+  };
+
+  const handleDecline = (match) => {
+    const user = match.matchedUser || match.user || match;
+    Alert.alert(
+      'Remove Match',
+      `Remove ${user.fullName || user.name} from your matches?`,
+      [
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => removeMatch(match.matchId || match.id || match._id),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleShowDetails = (item) => {
+    const rawUser = item.matchedUser || item.user || item;
+    const fullProfile = rawUser.fullProfile || item.fullProfile || {};
+    const user = { ...rawUser, ...fullProfile };
+    navigation.navigate('UserProfile', { user, isFromMatches: true });
+  };
+
+  const handleLikeProfile = (item) => {
+    const fullProfile = item.fullProfile || {};
+    const user = { ...item, ...fullProfile };
+    navigation.navigate('UserProfile', { user, isFromLikes: true });
+  };
+
+  const handleAcceptLike = async (item) => {
+    try {
+      const res = await discoverService.swipe({ targetId: item.id || item._id, action: 'like' });
+      if (res?.isMatch || res?.data?.isMatch) {
+        navigation.navigate('Match', { matchedUser: item });
+      }
+      fetchMatches();
+      fetchLikes();
+    } catch (e) {
+      console.error('Accept like error:', e);
+    }
+  };
+
+  const handleDeclineLike = async (item) => {
+    try {
+      await discoverService.swipe({ targetId: item.id || item._id, action: 'pass' });
+      fetchMatches();
+      fetchLikes();
+    } catch (e) {
+      console.error('Decline like error:', e);
+    }
+  };
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const SectionSeparator = ({ title, count }) => (
+    <View style={styles.sectionHeader}>
+      <View style={[styles.line, { backgroundColor: theme.actionButtonBorder }]} />
+      <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{title} {count > 0 ? `· ${count}` : ''}</Text>
+      <View style={[styles.line, { backgroundColor: theme.actionButtonBorder }]} />
+    </View>
+  );
+
+  const renderLikeItem = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.likeCard, 
+        { backgroundColor: theme.cardBackground },
+        theme.isDark && { borderWidth: 1.5, borderColor: theme.cardBorder }
+      ]}
+      onPress={() => handleLikeProfile(item)}
+      activeOpacity={0.8}
+    >
+      <FastImage source={{ uri: item.avatar || item.image }} style={styles.likeCardImage} />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.85)']}
+        style={styles.likeCardGradient}
+      />
+      <View style={styles.likeCardInfo}>
+        <Text style={styles.likeCardName} numberOfLines={1}>{item.fullName || item.name}</Text>
+        <Text style={styles.likeCardSub}>{item.age ? `${item.age} · ` : ''}{item.location?.city || 'Near you'}</Text>
+      </View>
+
+      {/* Decline / Accept Likes Row */}
+      <View style={[styles.likeCardActions, { backgroundColor: theme.isDark ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.95)' }]}>
+        <TouchableOpacity
+          style={styles.likeCardBtn}
+          onPress={(e) => { e.stopPropagation(); handleDeclineLike(item); }}
+          activeOpacity={0.7}
+        >
+          <Icon name="close" size={16} color="#FF4D67" />
+        </TouchableOpacity>
+
+        <View style={[styles.likeCardDivider, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : theme.actionButtonBorder }]} />
+
+        <TouchableOpacity
+          style={styles.likeCardBtn}
+          onPress={(e) => { e.stopPropagation(); handleAcceptLike(item); }}
+          activeOpacity={0.7}
+        >
+          <Icon name="heart" size={16} color="#E94057" />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+
+        {/* ── Header ── */}
+        <View style={styles.headerContainer}>
+          <View style={styles.headerTop}>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Matches</Text>
+            <TouchableOpacity style={[styles.sortButton, { borderColor: theme.actionButtonBorder, backgroundColor: theme.cardBackground }]}>
+              <Icon name="options-outline" size={22} color={theme.accent} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            People who have liked you and your matches.
+          </Text>
+        </View>
+
+        {/* ── Who Likes You ── */}
+        <View style={styles.likesSection}>
+          <Text style={[styles.likesHeading, { color: theme.textPrimary }]}>Who Likes You</Text>
+          {loadingLikes && likes.length === 0 ? (
+            <ActivityIndicator color={theme.accent} style={{ marginVertical: 30 }} />
+          ) : likes.length === 0 ? (
+            <View style={[styles.emptyLikesBox, { backgroundColor: theme.cardBackground, borderColor: theme.actionButtonBorder }]}>
+              <Text style={[styles.emptyLikesText, { color: theme.textSecondary }]}>No new likes yet. Keep swiping!</Text>
+            </View>
+          ) : (
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={likes}
+              keyExtractor={(item) => item.id || item._id}
+              renderItem={renderLikeItem}
+              contentContainerStyle={styles.likesList}
+              snapToInterval={156}
+              decelerationRate="fast"
+            />
+          )}
+        </View>
+
+        {/* ── Matches ── */}
+        {isLoading && matches.length === 0 ? (
+          <ActivityIndicator size="large" color={theme.accent} style={{ marginTop: 40 }} />
+        ) : matches.length > 0 && (
+          <View style={styles.matchesSection}>
+            <Text style={[styles.likesHeading, { color: theme.textPrimary }]}>Your Matches</Text>
+            <View style={styles.grid}>
+              {matches.map((item) => (
+                <MatchesGridItem
+                  key={item.matchId || item.id || item._id}
+                  match={item}
+                  onPress={() => handleShowDetails(item)}
+                  onChat={handleChat}
+                  onDecline={handleDecline}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {matches.length === 0 && (
+          <View style={styles.emptyState}>
+            <Icon name="heart-dislike-outline" size={48} color={theme.iconInactive} />
+            <Text style={[styles.emptyText, { color: theme.iconInactive }]}>No matches yet</Text>
+            <Text style={[styles.emptySubText, { color: theme.textSecondary }]}>Keep swiping to find your match!</Text>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// ─── Screen styles ────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 30 },
+
+  // Header
+  headerContainer: { marginTop: SPACING.l, marginBottom: SPACING.m, paddingHorizontal: SPACING.l },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+  title: { ...TYPOGRAPHY.h1, fontSize: 28, fontWeight: '500', fontFamily: TITLE_FONT },
+  sortButton: {
+    width: 42, height: 42, borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  subtitle: { ...TYPOGRAPHY.body, lineHeight: 20, fontSize: 13, fontFamily: TITLE_FONT },
+
+  // Section
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    marginVertical: SPACING.m, paddingHorizontal: SPACING.l,
+  },
+  line: { flex: 1, height: 1 },
+  sectionTitle: { fontSize: 12, marginHorizontal: 12, fontWeight: '600' },
+
+  // Grid
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    paddingHorizontal: SPACING.m,
+  },
+
+  // Empty
+  emptyState: { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
+  emptyText: { fontSize: 18, fontWeight: '700', marginTop: 16 },
+  emptySubText: { fontSize: 13, marginTop: 6 },
+
+  // Likes & Matches Section
+  likesSection: { marginVertical: SPACING.m },
+  matchesSection: { marginVertical: SPACING.m },
+  likesHeading: { ...TYPOGRAPHY.h2, fontSize: 18, paddingHorizontal: SPACING.l, marginBottom: 15, fontWeight: '500', fontFamily: TITLE_FONT },
+  likesList: { paddingHorizontal: SPACING.l, paddingBottom: 10 },
+  likeCard: {
+    width: 140, height: 150, marginRight: 16, borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+  },
+  likeCardImage: { width: '100%', height: '100%' },
+  likeCardGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%' },
+  likeCardInfo: { position: 'absolute', bottom: 42, left: 10, right: 10 },
+  likeCardName: { color: '#FFF', fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  likeCardSub: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600' },
+  likeCardActions: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  likeCardBtn: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  likeCardDivider: {
+    width: 1,
+    height: 18,
+  },
+  emptyLikesBox: {
+    marginHorizontal: SPACING.l, padding: 20,
+    borderRadius: 16, borderStyle: 'dashed', borderWidth: 1,
+    alignItems: 'center',
+  },
+  emptyLikesText: { fontSize: 14, fontStyle: 'italic' },
+});

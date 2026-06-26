@@ -1,0 +1,149 @@
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image as FastImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { decodeEmoji } from '../../../utils/stringUtils';
+import { useTheme } from '../../../theme/ThemeContext';
+
+export const MessageItem = ({ item, onPress }) => {
+  const { isDark, theme } = useTheme();
+
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.container, 
+        isDark && { 
+          borderBottomColor: theme.sectionDivider, 
+          borderTopColor: theme.sectionDivider,
+          borderTopWidth: 1 
+        }
+      ]} 
+      onPress={onPress}
+    >
+      {/* Dynamic wrapper testing if you need story rings */}
+      <View style={styles.avatarContainer}>
+          <LinearGradient
+            colors={item.hasActivity ? ['#E94057', '#8A2387'] : ['transparent', 'transparent']} // Active map vs simple
+            style={styles.gradientRing}
+          >
+            <View style={[
+              styles.imageWrapper, 
+              !item.hasActivity && { borderWidth: 0, padding: 0 },
+              isDark && { backgroundColor: theme.background, borderColor: theme.background }
+            ]}>
+               <FastImage source={{ uri: item.image }} style={styles.image} />
+            </View>
+          </LinearGradient>
+      </View>
+
+      <View style={styles.contentContainer}>
+        <View style={styles.topRow}>
+          <Text style={[styles.name, isDark && { color: '#FFFFFF' }]}>{decodeEmoji(item.name)}</Text>
+          <Text style={styles.time}>{item.time}</Text>
+        </View>
+
+        <View style={styles.bottomRow}>
+          <Text 
+            style={[
+              styles.messagePreview, 
+              item.unread && styles.unreadMessagePreview,
+              isDark && item.unread && { color: '#FFFFFF' }
+            ]} 
+            numberOfLines={1}
+          >
+            {item.isTyping ? 'Typing..' : decodeEmoji(item.lastMessage)}
+          </Text>
+          {!!item.unread && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{item.unread}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.m,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  avatarContainer: {
+    marginRight: SPACING.m,
+  },
+  gradientRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageWrapper: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 27,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  name: {
+    ...TYPOGRAPHY.body,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  time: {
+    ...TYPOGRAPHY.caption,
+    color: '#A0A0A0',
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  messagePreview: {
+    ...TYPOGRAPHY.bodySecondary,
+    color: '#A0A0A0',
+    flex: 1,
+    paddingRight: SPACING.s,
+  },
+  unreadMessagePreview: {
+    color: '#000000',
+    fontWeight: '600',
+  },
+  unreadBadge: {
+    backgroundColor: '#E94057',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  unreadText: {
+    ...TYPOGRAPHY.caption,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+});

@@ -1,0 +1,151 @@
+import React from 'react';
+import {
+  View, Text, StyleSheet, KeyboardAvoidingView,
+  Platform, TouchableOpacity,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
+import { CustomInput } from '../../../components/common/CustomInput';
+import { Button } from '../../../components/common/Button';
+import { useTheme } from '../../../theme/ThemeContext';
+
+const phoneSchema = yup.object().shape({
+  phone: yup
+    .string()
+    .required('Phone number is required')
+    .matches(/^[0-9]{10}$/, 'Must be a valid 10-digit phone number'),
+  password: yup.string().required('Password is required').min(8, 'Must be at least 8 characters'),
+  confirmPassword: yup.string()
+    .oneOf([yup.ref('password'), null], 'Passwords must match')
+    .required('Confirm password is required'),
+});
+
+import { useProfileSetupStore } from '../../profile-setup/store/useProfileSetupStore';
+
+export const PhoneInputScreen = ({ navigation }) => {
+  const { theme } = useTheme();
+  const { setAuthDetails } = useProfileSetupStore();
+  const { control, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(phoneSchema),
+    defaultValues: { phone: '', password: '', confirmPassword: '' },
+  });
+
+  const onSubmit = (data) => {
+    const fullPhone = `+91${data.phone}`;
+    setAuthDetails({ ...data, phone: fullPhone, email: '' }); // Clear email if continuing with phone
+    navigation.navigate('OTPVerification', { type: 'phone', value: fullPhone });
+  };
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboard}
+      >
+        {/* Back button */}
+        <TouchableOpacity
+          style={[styles.backBtn, { borderColor: theme.border, backgroundColor: theme.surface }]}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <Icon name="chevron-back" size={22} color={theme.isDark ? theme.accent : theme.primary} />
+        </TouchableOpacity>
+
+        <View style={styles.content}>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>My mobile</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Please enter your valid phone number. We will{'\n'}send you a 4-digit code to verify your account.
+          </Text>
+
+          <View style={styles.formContainer}>
+            <CustomInput
+              control={control}
+              name="phone"
+              placeholder="Enter phone number"
+              keyboardType="phone-pad"
+              showCountryCode={true}
+              isGradientBorder={false}
+              error={errors.phone?.message}
+            />
+
+            <CustomInput
+              control={control}
+              name="password"
+              placeholder="Password"
+              secureTextEntry={true}
+              error={errors.password?.message}
+            />
+
+            <CustomInput
+              control={control}
+              name="confirmPassword"
+              placeholder="Confirm Password"
+              secureTextEntry={true}
+              error={errors.confirmPassword?.message}
+            />
+          </View>
+
+          <Button
+            title="Continue"
+            onPress={handleSubmit(onSubmit)}
+            style={styles.button}
+            textStyle={styles.buttonText}
+            variant="primary"
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  keyboard: {
+    flex: 1,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SPACING.xl,
+    marginTop: SPACING.s,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: 40,
+  },
+  title: {
+    fontSize: 34,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif-medium',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif',
+    marginBottom: 40,
+  },
+  formContainer: {
+    marginBottom: 30,
+  },
+  button: {
+    borderRadius: 16,
+    height: 52,
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif-medium',
+  },
+});

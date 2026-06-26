@@ -1,0 +1,186 @@
+import React, { useState } from 'react';
+import { View, TextInput, Text, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
+import { Controller } from 'react-hook-form';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { COLORS, SPACING, TYPOGRAPHY } from '../../constants/theme';
+import { useTheme } from '../../theme/ThemeContext';
+
+export const CustomInput = ({
+  control,
+  name,
+  rules,
+  placeholder,
+  keyboardType = 'default',
+  showCountryCode = false,
+  isGradientBorder = false,
+  autoCapitalize,
+  error: externalError,
+  secureTextEntry = false,
+  maxLength,
+  ...rest
+}) => {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const { theme } = useTheme();
+
+  const InputWrapper = ({ children, hasError }) => {
+    if (isGradientBorder && !hasError) {
+      return (
+        <LinearGradient
+          colors={theme.isDark ? ['#F6DCA0', '#D4AF37'] : ['#E94057', '#8A2387']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientBorder}
+        >
+          <View style={[styles.innerContainer, { backgroundColor: theme.cardBackground }]}>{children}</View>
+        </LinearGradient>
+      );
+    }
+    return (
+      <View style={[
+        styles.container, 
+        { 
+          backgroundColor: theme.cardBackground, 
+          borderColor: theme.isDark ? theme.cardBorder : '#E8E8E8' 
+        }, 
+        hasError && styles.errorContainer
+      ]}>
+        {children}
+      </View>
+    );
+  };
+
+  return (
+    <Controller
+      control={control}
+      name={name}
+      rules={rules}
+      render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+        <View style={styles.wrapper}>
+          <InputWrapper hasError={!!error}>
+            {showCountryCode && (
+              <>
+                <TouchableOpacity style={styles.countryCodeContainer} activeOpacity={0.7}>
+                  <Image source={{ uri: 'https://flagcdn.com/w40/in.png' }} style={styles.flagImage} />
+                  <Text style={[styles.countryCode, { color: theme.textPrimary }]}>+91</Text>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </TouchableOpacity>
+                <View style={[styles.divider, { backgroundColor: theme.isDark ? theme.cardBorder : '#E8E8E8' }]} />
+              </>
+            )}
+            <TextInput
+              style={[styles.input, { color: theme.textPrimary }]}
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              placeholder={placeholder}
+              placeholderTextColor="#A0A0A0"
+              keyboardType={keyboardType}
+              autoCapitalize={autoCapitalize}
+              maxLength={maxLength}
+              secureTextEntry={secureTextEntry && !isPasswordVisible}
+              {...rest}
+            />
+            {secureTextEntry && (
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                activeOpacity={0.7}
+              >
+                <Icon
+                  name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color="#A0A0A0"
+                />
+              </TouchableOpacity>
+            )}
+          </InputWrapper>
+          {error && <Text style={styles.errorText}>{error.message}</Text>}
+        </View>
+      )}
+    />
+  );
+};
+
+const FONT = Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif';
+
+const baseContainerStyle = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  height: 56,
+  borderRadius: 28,
+  paddingHorizontal: SPACING.m,
+  backgroundColor: '#FFFFFF',
+};
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginVertical: SPACING.s,
+    width: '100%',
+  },
+  gradientBorder: {
+    padding: 1.5,
+    borderRadius: 29.5,
+    width: '100%',
+  },
+  innerContainer: {
+    ...baseContainerStyle,
+  },
+  container: {
+    ...baseContainerStyle,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+  },
+  errorContainer: {
+    borderColor: COLORS.error,
+  },
+  countryCodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  flagImage: {
+    width: 24,
+    height: 16,
+    borderRadius: 2,
+    marginRight: 6,
+  },
+  countryCode: {
+    fontSize: 15,
+    color: '#333333',
+    fontFamily: FONT,
+    fontWeight: '500',
+  },
+  dropdownArrow: {
+    fontSize: 8,
+    color: '#AAAAAA',
+    marginLeft: 5,
+    marginTop: 1,
+  },
+  divider: {
+    height: 24,
+    width: 1,
+    backgroundColor: '#E8E8E8',
+    marginHorizontal: SPACING.s,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333333',
+    fontFamily: FONT,
+    height: '100%',
+    // Remove blue browser outline on web
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+  },
+  errorText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
+    marginLeft: SPACING.m,
+  },
+  eyeButton: {
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%',
+  },
+});
