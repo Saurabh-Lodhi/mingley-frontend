@@ -9,12 +9,16 @@
       "bundleIdentifier": "com.shivam.mingley"
     },
     "android": {
-      "package": "com.shivam.mingley",
-      "usesCleartextTraffic": true
+      "package": "com.shivam.mingley"
     },
     "web": {
       "bundler": "metro",
       "output": "single"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "48ea7664-c47b-49da-a246-792fe58a2a53"
+      }
     }
   }
 }
