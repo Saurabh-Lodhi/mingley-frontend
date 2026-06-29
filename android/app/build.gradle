@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -88,6 +89,16 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace 'com.shivam.mingley'
+
+    splits {
+        abi {
+            reset()
+            enable true
+            universalApk true
+            include "armeabi-v7a", "arm64-v8a"
+        }
+    }
+
     defaultConfig {
         applicationId 'com.shivam.mingley'
         minSdkVersion rootProject.ext.minSdkVersion

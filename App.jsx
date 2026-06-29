@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Navigation } from './src/navigation';
 import { Toast } from './src/components/common/Toast';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import * as ScreenCapture from 'expo-screen-capture';
 
 // Inject global CSS fixes for web platform
 if (Platform.OS === 'web') {
