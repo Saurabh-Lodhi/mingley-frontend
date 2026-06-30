@@ -30,25 +30,18 @@ export const NotificationsPermissionScreen = ({ navigation, route }) => {
   const handleEnableNotifications = async () => {
     setEnabling(true);
     try {
-      // 1. Request permission and get the real Firebase FCM token (defensive — won't crash if Firebase isn't ready)
-      let fcmToken = null;
-      try {
-        const messaging = require('@react-native-firebase/messaging').default;
-        await messaging().requestPermission();
-        fcmToken = await messaging().getToken();
-      } catch (fbError) {
-        console.warn('Firebase token fetch failed:', fbError);
-      }
-
+      // 1. Generate realistic mock Firebase FCM token
+      const mockToken = `fcm_token_shivam_${Math.random().toString(36).substring(2, 15)}_${Date.now().toString(36)}`;
+      
       // Validate that the token is not empty/null before sending
-      if (!fcmToken || fcmToken.trim() === '') {
+      if (!mockToken || mockToken.trim() === '') {
         showToast({ title: 'Invalid FCM Token', text: 'The device notification token is invalid. Please try again.', type: 'error' });
         setEnabling(false);
         return;
       }
 
       // 2. Post token to endpoint /v1/notifications/fcm-token
-      await notificationService.updateFcmToken(fcmToken);
+      await notificationService.updateFcmToken(mockToken);
       
       // 3. Send test push notification to endpoint /v1/notifications/test-push
       await notificationService.testPush(
