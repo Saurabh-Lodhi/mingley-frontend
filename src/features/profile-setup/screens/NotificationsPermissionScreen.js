@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as FastImage } from 'expo-image';
-import messaging from '@react-native-firebase/messaging';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../../constants/theme';
 import { Button } from '../../../components/common/Button';
 
@@ -31,9 +30,15 @@ export const NotificationsPermissionScreen = ({ navigation, route }) => {
   const handleEnableNotifications = async () => {
     setEnabling(true);
     try {
-      // 1. Request permission and get the real Firebase FCM token
-      await messaging().requestPermission();
-      const fcmToken = await messaging().getToken();
+      // 1. Request permission and get the real Firebase FCM token (defensive — won't crash if Firebase isn't ready)
+      let fcmToken = null;
+      try {
+        const messaging = require('@react-native-firebase/messaging').default;
+        await messaging().requestPermission();
+        fcmToken = await messaging().getToken();
+      } catch (fbError) {
+        console.warn('Firebase token fetch failed:', fbError);
+      }
 
       // Validate that the token is not empty/null before sending
       if (!fcmToken || fcmToken.trim() === '') {

@@ -6,9 +6,14 @@
 import { AppRegistry } from 'react-native';
 import App from './App';
 
-messaging().setBackgroundMessageHandler(async remoteMessage => {
-  console.log('Background message:', remoteMessage);
-});
+try {
+  const messaging = require('@react-native-firebase/messaging').default;
+  messaging().setBackgroundMessageHandler(async remoteMessage => {
+    console.log('Background message:', remoteMessage);
+  });
+} catch (e) {
+  console.warn('Firebase background handler failed to register:', e);
+}
 
 AppRegistry.registerComponent('main', () => App);
 
