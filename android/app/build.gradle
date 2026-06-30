@@ -90,14 +90,6 @@ android {
 
     namespace 'com.shivam.mingley'
 
-    splits {
-        abi {
-            reset()
-            enable true
-            universalApk true
-            include "armeabi-v7a", "arm64-v8a"
-        }
-    }
 
     defaultConfig {
         applicationId 'com.shivam.mingley'
