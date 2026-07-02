@@ -383,31 +383,64 @@ export const FilterSheet = React.memo(({ visible, onClose, onApply }) => {
   }, [onClose, onApply]);
   const handleClear = useCallback(() => reset(), [reset]);
 
+  // const detectGPSLocation = async () => {
+  //   setLoadingLocation(true);
+  //   try {
+  //     const { status } = await Location.requestForegroundPermissionsAsync();
+  //     if (status !== 'granted') {
+  //       Alert.alert('Permission Denied', 'Location permission is required to detect your location.');
+  //       setLoadingLocation(false);
+  //       return;
+  //     }
+  //     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  //     const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+  //     if (geo) {
+  //       const city = geo.city || geo.subregion || geo.district || 'Unknown City';
+  //       const country = geo.country || 'India';
+  //       await updateManualLocation(city, country, loc.coords.latitude, loc.coords.longitude);
+  //     } else {
+  //       Alert.alert('Error', 'Could not resolve location coordinates.');
+  //     }
+  //   } catch (err) {
+  //     console.error(err);
+  //     Alert.alert('Error', 'Failed to detect current location.');
+  //   } finally {
+  //     setLoadingLocation(false);
+  //   }
+  // };
+
+
   const detectGPSLocation = async () => {
-    setLoadingLocation(true);
+  setLoadingLocation(true);
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Location permission is required to detect your location.');
+      setLoadingLocation(false);
+      return;
+    }
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+
+    let city = 'Unknown City';
+    let country = 'India';
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required to detect your location.');
-        setLoadingLocation(false);
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const [geo] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       if (geo) {
-        const city = geo.city || geo.subregion || geo.district || 'Unknown City';
-        const country = geo.country || 'India';
-        await updateManualLocation(city, country, loc.coords.latitude, loc.coords.longitude);
-      } else {
-        Alert.alert('Error', 'Could not resolve location coordinates.');
+        city = geo.city || geo.subregion || geo.district || 'Unknown City';
+        country = geo.country || 'India';
       }
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'Failed to detect current location.');
-    } finally {
-      setLoadingLocation(false);
+    } catch (geoErr) {
+      console.warn('On-device reverse geocode failed, backend will resolve it:', geoErr);
     }
-  };
+
+    await updateManualLocation(city, country, loc.coords.latitude, loc.coords.longitude);
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Error', err?.message || 'Failed to detect current location.');
+  } finally {
+    setLoadingLocation(false);
+  }
+};
 
   const updateManualLocation = async (city, country, lat, lng) => {
     try {
