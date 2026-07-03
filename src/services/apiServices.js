@@ -45,6 +45,14 @@ export const authService = {
       throw error.response?.data || error.message;
     }
   },
+  verifyOtp: async (userId, otp, purpose = 'registration') => {
+    try {
+      const response = await api.post('/v1/auth/verify-otp', { userId, otp, purpose });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
 
   logout: async () => {
     try {
